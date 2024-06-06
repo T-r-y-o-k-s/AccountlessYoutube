@@ -48,7 +48,7 @@ function getSubscriptionVideosAndIconUrl(subscription) {
             }
             
             try {
-                subIconUrl = ytInitialData["header"]["c4TabbedHeaderRenderer"]["avatar"]["thumbnails"].slice(-1)[0]["url"];
+                subIconUrl = ytInitialData["header"]["pageHeaderRenderer"]["content"]["pageHeaderViewModel"]["image"]["decoratedAvatarViewModel"]["avatar"]["avatarViewModel"]["image"]["sources"].slice(-1)[0]["url"];
             } catch (e) {
                 console.log("Failed to get channel icon!");
                 console.log("Error: ", e);
