@@ -500,6 +500,93 @@ function hijackFeed() {
     return false;
 }
 
+function injectPanelExportImport(panel) {
+    var subLen = Object.keys(subscriptions).length;
+    
+    var injectedDiv = document.createElement("div");
+    injectedDiv.classList.add("injected-yt", "panel-export-import"); // panel-export-import is yet to be done in css? or not needed, I guess
+    injectedDiv.style.marginBottom = subLen > 0 ? "40px" : "10px";
+    panel.appendChild(injectedDiv);
+    
+    if (subLen > 0) { // export button
+        var exportButton = document.createElement("button");
+        exportButton.style = "border-color: transparent; background-color: rgb(232, 230, 227); border-radius: 20px; cursor: pointer; font-family: sans-serif; font-weight: 500; font-size: 15px; padding: 5px 12px 7px 12px; position: absolute; left: 45px;";
+        exportButton.innerHTML = "<span role=\"text\">Export</span>";
+        injectedDiv.appendChild(exportButton);
+        
+        exportButton.onclick = async () => {
+            console.log("Exporting subscriptions");
+            // Make sure we are in sync
+            await ensure(readStorageData, () => { return sleep(1_000); });
+            
+            var subs = [];
+            for (var sub in subscriptions) {
+                subs = subs.concat(sub);
+            }
+            
+            var a = document.createElement('a');
+            var blob = new Blob([subs], {'type':"text/csv"});
+            a.href = window.URL.createObjectURL(blob);
+            a.download = "offline subscriptions.accountless-yt.txt";
+            a.click();
+        };
+    }
+    
+    { // import button
+    var importButton = document.createElement("button");
+    importButton.style = "border-color: transparent; background-color: rgb(232, 230, 227); border-radius: 20px; cursor: pointer; font-family: sans-serif; font-weight: 500; font-size: 15px; padding: 5px 12px 7px 12px; position: absolute;";
+    importButton.style.marginTop = subLen > 0 ? "0px" : "-20px";
+    importButton.style.left = subLen > 0 ? "130px" : "80px";
+    importButton.innerHTML = "<span role=\"text\">Import</span>";
+    injectedDiv.appendChild(importButton);
+    
+    importButton.onclick = async () => {
+        var fileSelector = document.createElement('input');
+        fileSelector.setAttribute('type', 'file');
+        fileSelector.setAttribute('accept', '.accountless-yt.txt');
+        fileSelector.style = "display: none;";
+        fileSelector.onchange = e => {
+            var file = e.target.files[0]; // getting a hold of the file reference
+            
+            // setting up the reader
+            var reader = new FileReader();
+            reader.readAsText(file, 'UTF-8');
+            
+            // here we tell the reader what to do when it's done reading...
+            reader.onload = readerEvent => {
+                subscriptions = {}; // overwrite all existing subscriptions
+                feedVideos    = []; // and reset the list of videos in the feed
+                
+                var content = readerEvent.target.result;
+                if (content == "") { // empty file
+                    console.log("Clearing subscriptions");
+                } else {
+                    content = content.replace(/\s+/g, ''); // remove all whitespaces
+                    content = strReplaceRegex(content, /,,/g, ','); // replace two or more commas with one
+                    console.log("Importing subscriptions: ", content);
+                    
+                    var newSubs = csvStringToArray(content)[0];
+                    for (var subIndex in newSubs) {
+                        var newSub = newSubs[subIndex]; // newSub is the name of the channel
+                        if (newSub == "") continue;
+                        var res = getSubscriptionVideosAndIconUrl(newSub);
+                        feedVideos = feedVideos.concat(res[0]);
+                        sortFeed();
+                        if (res[1] == "") res[1] = getMissingChannelIcon();
+                        subscriptions[newSub] = res[1]; // creates both key and value
+                    }
+                }
+                lastUpdated = new Date();
+                ensure(writeStorageData, () => { return sleep(500); });
+            };
+        };
+        
+        document.body.appendChild(fileSelector);
+        fileSelector.click(); // because the user interacted with the importButton, we are permitted to interact with other stuff
+    };
+    }
+}
+
 async function hijackPanelSubs() {
     try {
         var panel = document.querySelector("ytd-guide-renderer[id=\"guide-renderer\"]");
@@ -512,11 +599,15 @@ async function hijackPanelSubs() {
 
         var panelData = panel.getElementsByTagName("ytd-guide-section-renderer");
         if (panelData === null) return false;
+        
         var panelSubs = panelData[1].querySelector("div[id=\"items\"]");
         panelSubs.innerHTML = "";
+        
         for (var sub in subscriptions) {
             injectPanelChannel(panelSubs, sub, "/@" + sub, subscriptions[sub]);
         }
+
+        injectPanelExportImport(panelSubs);
 
         document.querySelectorAll('img.lazy').forEach(img => {
             lazyImgObserver.observe(img);
@@ -579,6 +670,32 @@ async function hijackSubscribeButton() {
 
 /////////////////////////////////////////////////////////////////////
 
+function csvStringToArray(strData) { // https://gist.github.com/Jezternz/c8e9fafc2c114e079829974e3764db75
+    const objPattern = new RegExp(("(\\,|\\r?\\n|\\r|^)(?:\"([^\"]*(?:\"\"[^\"]*)*)\"|([^\\,\\r\\n]*))"),"gi");
+    let arrMatches = null, arrData = [[]];
+    while (arrMatches = objPattern.exec(strData)){
+        if (arrMatches[1].length && arrMatches[1] !== ",")arrData.push([]);
+        arrData[arrData.length - 1].push(arrMatches[2] ? 
+            arrMatches[2].replace(new RegExp( "\"\"", "g" ), "\"") :
+            arrMatches[3]);
+    }
+    return arrData;
+}
+
+function strReplaceRegex(str, regex, replace) { // https://stackoverflow.com/a/36642097
+    var matched = false;
+    str = str.replace(regex, function(match, $1, $2) {
+        if (match) {
+            matched = true;
+        }
+        return replace;
+    });
+    if (matched) {
+        str = strReplaceRegex(str, regex, replace);
+    }
+    
+    return str;
+}
 
 // this is just a question mark on red background, to indicate that a given channels icon can not be found
 function getMissingChannelIcon() {
