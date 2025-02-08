@@ -17,6 +17,7 @@ are not perfect so this is why you might notice a different look/behaviour.
 
 You can also import and export the list of subscriptions to a file.
 
+#### Autoloading
 As this extension is not available on [AMO](https://addons.mozilla.org/), you'll need to load it as a temporary extension each time you restart the browser. <br>
 I've found it quite helpful to make Firefox automatically load this addon as described in [this guide](https://tsaost.github.io/autoload-temporary-addon/). <br>
-Be sure to remove the [relevant lines](https://github.com/tsaost/autoload-temporary-addon/pull/3/files) on newer versions of Firefox to make that hack work.
+Be sure to follow both [PR#3](https://github.com/tsaost/autoload-temporary-addon/pull/3/files) and [PR#7](https://github.com/tsaost/autoload-temporary-addon/pull/7/files) to make that hack work on newer versions of Firefox.
